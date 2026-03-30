@@ -69,12 +69,19 @@ class VideoAnalyzer:
         
         total_brightness, total_saturation, total_motion = 0, 0, 0
         frame_count = 0
+        processed_frame_count = 0
         prev_gray = None
+        
+        frame_skip = int(os.environ.get("FRAME_SKIP", "10"))
 
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
+                
+            frame_count += 1
+            if frame_count % frame_skip != 0:
+                continue
             
             # Use smaller frame for faster feature extraction
             small_frame = cv2.resize(frame, (320, 180))
@@ -87,7 +94,7 @@ class VideoAnalyzer:
             if prev_gray is not None:
                 total_motion += cv2.absdiff(gray, prev_gray).mean()
             prev_gray = gray
-            frame_count += 1
+            processed_frame_count += 1
             
             # Cut detection using histogram
             hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
@@ -107,10 +114,10 @@ class VideoAnalyzer:
         target_bpm = min(max(int(80 + (cuts_per_minute * 0.5)), 60), 160)
         
         # Calculate Visual Context
-        if frame_count > 0:
-            avg_brightness = total_brightness / frame_count
-            avg_saturation = total_saturation / frame_count
-            avg_motion = total_motion / frame_count
+        if processed_frame_count > 0:
+            avg_brightness = total_brightness / processed_frame_count
+            avg_saturation = total_saturation / processed_frame_count
+            avg_motion = total_motion / processed_frame_count
             
             brightness_desc = "dark" if avg_brightness < 85 else "bright" if avg_brightness > 170 else "balanced lighting"
             saturation_desc = "muted" if avg_saturation < 60 else "vibrant" if avg_saturation > 140 else "standard colors"

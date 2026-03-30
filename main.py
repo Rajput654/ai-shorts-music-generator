@@ -1,6 +1,11 @@
 import os
 import logging
 import time
+import uuid
+from dotenv import load_dotenv
+
+# Load configuration from .env if present
+load_dotenv()
 
 # Import the classes we built in the previous steps
 from phase1_extractor import VideoAnalyzer
@@ -12,12 +17,19 @@ from phase4_mixer import FinalMixer
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("AutoComposerAgent")
 
-def run_agent(input_video, output_dir="workspace", target_duration=30):
+def run_agent(input_video, base_workspace="workspace", target_duration=30):
     """
     Runs the entire automated music composition and mixing pipeline.
     """
-    logger.info("=== STARTING AUTOMATED COMPOSER AGENT ===")
+    job_id = str(uuid.uuid4())
+    output_dir = os.path.join(base_workspace, f"job_{job_id}")
+    
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    logger.info(f"=== STARTING AUTOMATED COMPOSER AGENT (Job: {job_id}) ===")
     logger.info(f"Target Video: {input_video}")
+    logger.info(f"Workspace initialized at: {output_dir}")
     start_time = time.time()
 
     if not os.path.exists(input_video):
@@ -96,5 +108,6 @@ if __name__ == "__main__":
     # Point this to the video you want to process
     TARGET_VIDEO = "input_test_video.mp4" 
     
-    # Run the agent (defaulting to 30 seconds of music generation)
-    run_agent(input_video=TARGET_VIDEO, target_duration=30)
+    # Run the agent (defaulting to duration from env, fallback 30 seconds)
+    duration = int(os.getenv("TARGET_DURATION", "30"))
+    run_agent(input_video=TARGET_VIDEO, target_duration=duration)

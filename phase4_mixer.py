@@ -55,7 +55,7 @@ class FinalMixer:
         
         # 2. The Auto-Ducking Logic
         chunk_size = 100 # Analyze audio in 100 millisecond chunks
-        ducked_bgm = AudioSegment.empty()
+        chunks = []
         
         for i in range(0, len(vocals), chunk_size):
             vocal_chunk = vocals[i:i + chunk_size]
@@ -64,10 +64,14 @@ class FinalMixer:
             # If the vocals in this tiny chunk are louder than the threshold (someone is speaking)
             if vocal_chunk.dBFS > threshold_db:
                 # Lower the BGM volume
-                ducked_bgm += bgm_chunk - abs(ducking_db)
+                chunks.append((bgm_chunk - abs(ducking_db)).raw_data)
             else:
                 # Keep normal volume during silence/breaths
-                ducked_bgm += bgm_chunk
+                chunks.append(bgm_chunk.raw_data)
+
+        # Reconstruct the audio segment from raw bytes (O(N) time)
+        raw_ducked_data = b"".join(chunks)
+        ducked_bgm = bgm._spawn(raw_ducked_data)
 
         # 3. Mix the tracks together
         logging.info("Mixing vocals and processed BGM together...")

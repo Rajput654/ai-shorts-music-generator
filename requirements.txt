@@ -10,6 +10,10 @@ pydub>=0.25.1
 openai-whisper>=20231117
 requests>=2.31.0
 
+# Production Readiness (Env and Resilience)
+python-dotenv>=1.0.0
+tenacity>=8.2.0
+
 # PyTorch and Music Generation (AudioCraft)
 torch>=2.1.0
 torchaudio>=2.1.0

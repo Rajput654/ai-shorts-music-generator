@@ -3,6 +3,7 @@ import requests
 import json
 import logging
 import os
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -14,8 +15,8 @@ class AIComposer:
         self.visual_context = visual_context
         # We use the 'base' model for speed and low VRAM usage. 
         # For a short video, this is usually accurate enough.
-        self.whisper_model_size = "base" 
-        self.ollama_url = "http://localhost:11434/api/generate"
+        self.whisper_model_size = os.getenv("WHISPER_MODEL", "base")
+        self.ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
         self.music_prompt = ""
 
     def transcribe_audio(self):
@@ -62,11 +63,14 @@ class AIComposer:
             "stream": False
         }
 
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+        def _make_request():
+            response = requests.post(self.ollama_url, json=payload, timeout=30)
+            response.raise_for_status()
+            return response.json()
+
         try:
-            response = requests.post(self.ollama_url, json=payload)
-            response.raise_for_status() # Raise an exception for bad status codes
-            
-            response_data = response.json()
+            response_data = _make_request()
             raw_prompt = response_data.get("response", "").strip()
             
             # Fallback if the LLM gets too chatty despite instructions
@@ -80,7 +84,7 @@ class AIComposer:
             return self.music_prompt
 
         except requests.exceptions.ConnectionError:
-            logging.error("Failed to connect to Ollama. Is the Ollama app running in the background?")
+            logging.error("Failed to connect to Ollama after retries. Is the Ollama app running in the background?")
             # Dynamic fallback based on visual context
             mood = "neutral, ambient"
             if "dark" in self.visual_context: mood = "atmospheric, dark, cinematic"
