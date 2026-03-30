@@ -1,0 +1,114 @@
+import whisper
+import requests
+import json
+import logging
+import os
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class AIComposer:
+    def __init__(self, audio_path, target_bpm):
+        self.audio_path = audio_path
+        self.target_bpm = target_bpm
+        # We use the 'base' model for speed and low VRAM usage. 
+        # For a short video, this is usually accurate enough.
+        self.whisper_model_size = "base" 
+        self.ollama_url = "http://localhost:11434/api/generate"
+        self.music_prompt = ""
+
+    def transcribe_audio(self):
+        """Transcribes the isolated vocals to understand the video's topic."""
+        logging.info(f"Loading Whisper model '{self.whisper_model_size}' for transcription...")
+        try:
+            # Load model and transcribe
+            model = whisper.load_model(self.whisper_model_size)
+            result = model.transcribe(self.audio_path)
+            transcript = result["text"].strip()
+            
+            if not transcript:
+                logging.warning("Transcription empty. Video might have no dialogue.")
+                return "No dialogue. Focus on visual pacing."
+            
+            logging.info(f"Transcription complete: '{transcript[:50]}...'")
+            return transcript
+            
+        except FileNotFoundError:
+             logging.error(f"Audio file not found at {self.audio_path}. Did Phase 1 complete?")
+             return None
+        except Exception as e:
+            logging.error(f"Whisper transcription failed: {e}")
+            return None
+
+    def generate_music_prompt(self, transcript):
+        """Uses a local LLM via Ollama to write a specific prompt for MusicGen."""
+        logging.info("Consulting the LLM Composer to write the music prompt...")
+        
+        # System prompt designed specifically to format output for AudioCraft/MusicGen
+        system_instructions = (
+            "You are an expert music producer scoring a video. "
+            "Analyze the transcript and the target BPM. "
+            "Output ONLY a comma-separated list of musical descriptors (genre, mood, instruments). "
+            "Do not include conversational text like 'Here is the prompt'. "
+            f"Mandatory requirement: Include '{self.target_bpm} BPM' at the start."
+        )
+        
+        user_prompt = f"Transcript context: {transcript}"
+
+        payload = {
+            "model": "llama3",
+            "prompt": f"{system_instructions}\n\n{user_prompt}",
+            "stream": False
+        }
+
+        try:
+            response = requests.post(self.ollama_url, json=payload)
+            response.raise_for_status() # Raise an exception for bad status codes
+            
+            response_data = response.json()
+            raw_prompt = response_data.get("response", "").strip()
+            
+            # Fallback if the LLM gets too chatty despite instructions
+            if "Here is" in raw_prompt or raw_prompt.count(",") < 2:
+                 logging.warning("LLM output formatting poor. Applying strict formatting.")
+                 self.music_prompt = f"{self.target_bpm} BPM, cinematic background music, atmospheric, synth, bass"
+            else:
+                 self.music_prompt = raw_prompt
+                 
+            logging.info(f"Final Music Prompt Generated: [{self.music_prompt}]")
+            return self.music_prompt
+
+        except requests.exceptions.ConnectionError:
+            logging.error("Failed to connect to Ollama. Is the Ollama app running in the background?")
+            # Hard fallback so the pipeline doesn't completely die
+            self.music_prompt = f"{self.target_bpm} BPM, neutral background lofi beat, ambient"
+            return self.music_prompt
+            
+        except Exception as e:
+            logging.error(f"LLM Prompt generation failed: {e}")
+            return None
+
+    def run_pipeline(self):
+        transcript = self.transcribe_audio()
+        if transcript is not None:
+            prompt = self.generate_music_prompt(transcript)
+            return {"music_prompt": prompt, "target_bpm": self.target_bpm}
+        return None
+
+# Execution Block
+if __name__ == "__main__":
+    # Simulating data passed from Phase 1
+    # Replace with the actual path to the vocals extracted in Phase 1
+    test_vocals_path = "workspace/htdemucs/raw_audio/vocals.wav" 
+    test_bpm = 110
+    
+    # Create a dummy file for testing if it doesn't exist
+    if not os.path.exists(test_vocals_path):
+        os.makedirs(os.path.dirname(test_vocals_path), exist_ok=True)
+        with open(test_vocals_path, 'w') as f:
+            f.write("dummy")
+
+    composer = AIComposer(audio_path=test_vocals_path, target_bpm=test_bpm)
+    results = composer.run_pipeline()
+    
+    print(f"\nPhase 2 Complete. Data to pass to Phase 3: {results}")

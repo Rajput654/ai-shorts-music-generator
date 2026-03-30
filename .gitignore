@@ -1,0 +1,22 @@
+# Ignore AI generated outputs
+workspace/
+output/
+input/
+
+# Ignore test media
+*.mp4
+*.wav
+*.mkv
+*.avi
+
+# Ignore Python cache & virtual environments
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.env
+
+# Ignore system files
+.DS_Store
+Thumbs.db
