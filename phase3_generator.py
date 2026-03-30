@@ -35,6 +35,10 @@ class MusicGenerator:
             
         # Automatically detect if a GPU is available to speed up generation
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        # Optimize PyTorch performance if using GPU
+        if self.device == "cuda":
+            torch.backends.cudnn.benchmark = True
 
     def generate_track(self):
         logging.info(f"Initializing MusicGen on {self.device.upper()}...")
@@ -50,7 +54,12 @@ class MusicGenerator:
             logging.info(f"Generating {self.duration} seconds of audio for prompt: '{self.prompt}'")
             
             # The generation step (This is where the AI actually "composes" the audio)
-            wav_tensor = model.generate([self.prompt]) 
+            if self.device == "cuda":
+                # Use mixed precision (FP16) on GPU to drastically speed up generation
+                with torch.autocast(device_type="cuda", dtype=torch.float16):
+                    wav_tensor = model.generate([self.prompt]) 
+            else:
+                wav_tensor = model.generate([self.prompt]) 
             
             # Save the generated audio tensor to a file
             for idx, one_wav in enumerate(wav_tensor):

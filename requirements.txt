@@ -17,4 +17,5 @@ tenacity>=8.2.0
 # PyTorch and Music Generation (AudioCraft)
 torch>=2.1.0
 torchaudio>=2.1.0
+xformers>=0.0.22
 git+https://github.com/facebookresearch/audiocraft.git

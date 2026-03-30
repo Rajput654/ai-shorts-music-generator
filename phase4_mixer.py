@@ -1,6 +1,6 @@
 import os
 import logging
-from pydub import AudioSegment
+from pydub import AudioSegment, silence
 import ffmpeg
 
 # Set up logging
@@ -52,40 +52,47 @@ class FinalMixer:
         vocals = vocals.normalize()
         bgm = bgm.normalize() - 5 # Drop base BGM volume a bit
 
-        logging.info("Applying Auto-Ducking to background music...")
+        logging.info("Applying native O(K) Auto-Ducking logic to background music...")
         
-        # 2. The Auto-Ducking Logic & Visual Sidechain Sync
-        chunk_size = 100 # Analyze audio in 100 millisecond chunks
-        chunks = []
+        # 2. Native Auto-Ducking Logic & Visual Sidechain Sync
+        # Detect where vocals are actively speaking instead of O(N) checking every 100ms
+        nonsilent_ranges = silence.detect_nonsilent(vocals, min_silence_len=200, silence_thresh=threshold_db)
         
-        # Convert cut timestamps to milliseconds for fast iteration
+        # Create forced ducking ranges for visual impacts (200ms before a visual cut)
         cut_ms_list = [int(ct * 1000) for ct in self.cut_timestamps]
+        cut_ranges = [[max(0, cut_ms - 200), cut_ms] for cut_ms in cut_ms_list]
         
-        for i in range(0, len(vocals), chunk_size):
-            vocal_chunk = vocals[i:i + chunk_size]
-            bgm_chunk = bgm[i:i + chunk_size]
-            
-            # Artificial Sidechain Check: If this audio chunk is right before a visual cut (e.g., 200ms before)
-            is_pre_cut = any([cut_ms - 200 <= i < cut_ms for cut_ms in cut_ms_list])
-            
-            # If the vocals in this tiny chunk are louder than the threshold (someone is speaking)
-            if vocal_chunk.dBFS > threshold_db:
-                # Lower the BGM volume for speaking
-                duck_amount = abs(ducking_db)
-            elif is_pre_cut:
-                # Force an aggressive volume drop just before the visual cut so it "impacts" heavily on the cut frame
-                duck_amount = 12 
+        # Merge all ranges where ducking should occur
+        all_ranges = nonsilent_ranges + cut_ranges
+        all_ranges.sort(key=lambda x: x[0])
+        
+        merged_ranges = []
+        for r in all_ranges:
+            if not merged_ranges:
+                merged_ranges.append(r)
             else:
-                duck_amount = 0
-                
-            if duck_amount > 0:
-                chunks.append((bgm_chunk - duck_amount).raw_data)
-            else:
-                chunks.append(bgm_chunk.raw_data)
+                last = merged_ranges[-1]
+                if r[0] <= last[1]:
+                    merged_ranges[-1] = [last[0], max(last[1], r[1])]
+                else:
+                    merged_ranges.append(r)
 
-        # Reconstruct the audio segment from raw bytes (O(N) time)
-        raw_ducked_data = b"".join(chunks)
-        ducked_bgm = bgm._spawn(raw_ducked_data)
+        # Slice and reconstruct the BGM natively
+        final_bgm = AudioSegment.empty()
+        last_end = 0
+        
+        for start, end in merged_ranges:
+            # Add normal volume portion
+            final_bgm += bgm[last_end:start]
+            
+            # Apply ducking
+            duck_amount = 12 if end - start == 200 and start in [c[0] for c in cut_ranges] else abs(ducking_db)
+            final_bgm += bgm[start:end] - duck_amount
+            last_end = end
+            
+        # Append any remaining audio tail
+        final_bgm += bgm[last_end:]
+        ducked_bgm = final_bgm
 
         # 3. Mix the tracks together
         logging.info("Mixing vocals and processed BGM together...")

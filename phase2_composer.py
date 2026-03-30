@@ -9,6 +9,16 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class AIComposer:
+    _whisper_model_instance = None
+    _loaded_model_size = None
+
+    @classmethod
+    def get_whisper_model(cls, model_size):
+        if cls._whisper_model_instance is None or cls._loaded_model_size != model_size:
+            logging.info(f"Loading Whisper model '{model_size}' into memory (this will only happen once)...")
+            cls._whisper_model_instance = whisper.load_model(model_size)
+            cls._loaded_model_size = model_size
+        return cls._whisper_model_instance
     def __init__(self, audio_path, target_bpm, visual_context=""):
         self.audio_path = audio_path
         self.target_bpm = target_bpm
@@ -21,10 +31,10 @@ class AIComposer:
 
     def transcribe_audio(self):
         """Transcribes the isolated vocals to understand the video's topic."""
-        logging.info(f"Loading Whisper model '{self.whisper_model_size}' for transcription...")
+        logging.info("Retrieving cached Whisper model...")
         try:
             # Load model and transcribe
-            model = whisper.load_model(self.whisper_model_size)
+            model = self.get_whisper_model(self.whisper_model_size)
             result = model.transcribe(self.audio_path)
             transcript = result["text"].strip()
             

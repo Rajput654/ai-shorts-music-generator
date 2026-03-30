@@ -2,6 +2,7 @@ import os
 import logging
 import time
 import uuid
+import shutil
 from dotenv import load_dotenv
 
 # Load configuration from .env if present
@@ -95,15 +96,33 @@ def run_agent(input_video, base_workspace="workspace", target_duration=30):
         return False
 
     # ---------------------------------------------------------
-    # FINISH
+    # FINISH & CLEANUP
     # ---------------------------------------------------------
+    master_output_dir = "output"
+    if not os.path.exists(master_output_dir):
+        os.makedirs(master_output_dir)
+        
+    final_dest = os.path.join(master_output_dir, f"FINAL_{job_id}.mp4")
+    try:
+        shutil.move(final_video_path, final_dest)
+    except Exception as e:
+        logger.error(f"Failed to move final video: {e}")
+        final_dest = final_video_path
+        
+    # Cleanup memory leaks from disk
+    try:
+        shutil.rmtree(output_dir)
+        logger.info(f"Cleaned up temporary workspace: {output_dir}")
+    except Exception as e:
+        logger.error(f"Failed to cleanup workspace {output_dir}: {e}")
+
     elapsed_time = round(time.time() - start_time, 2)
     logger.info("\n=================================================")
     logger.info(f"✅ AGENT RUN COMPLETE IN {elapsed_time} SECONDS")
-    logger.info(f"🎬 Final Video Ready: {final_video_path}")
+    logger.info(f"🎬 Final Video Ready: {final_dest}")
     logger.info("=================================================")
     
-    return final_video_path
+    return final_dest
 
 if __name__ == "__main__":
     # Point this to the video you want to process
