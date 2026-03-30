@@ -85,6 +85,7 @@ def run_agent(input_video, base_workspace="workspace", target_duration=30):
         original_video=input_video, 
         vocals_path=p1_data["vocals_path"], 
         bgm_path=bgm_path, 
+        cut_timestamps=p1_data.get("cut_timestamps", []),
         output_dir=output_dir
     )
     final_video_path = mixer.run_pipeline()

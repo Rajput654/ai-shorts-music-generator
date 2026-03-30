@@ -46,13 +46,13 @@ class AIComposer:
         """Uses a local LLM via Ollama to write a specific prompt for MusicGen."""
         logging.info("Consulting the LLM Composer to write the music prompt...")
         
-        # System prompt designed specifically to format output for AudioCraft/MusicGen
+        # System prompt designed specifically to format output for AudioCraft/MusicGen tags
         system_instructions = (
-            "You are an expert music producer scoring a video. "
-            "Analyze the transcript, the visual context, and the target BPM. "
-            "Output ONLY a comma-separated list of musical descriptors (genre, mood, instruments). "
-            "Do not include conversational text like 'Here is the prompt'. "
-            f"Mandatory requirement: Include '{self.target_bpm} BPM' at the start."
+            "You are an expert music producer generating tags for MusicGen to score a video. "
+            "Analyze the transcript, visual context, and target BPM. "
+            "Output ONLY a comma-separated list of specific Musical Tags. "
+            "Do not use conversational English. "
+            f"Mandatory Format: BPM: {self.target_bpm}, Key: [Choose a key], [Genre], [Mood], [Instruments]"
         )
         
         user_prompt = f"Transcript context: {transcript}\nVisual context: {self.visual_context}"
@@ -76,7 +76,7 @@ class AIComposer:
             # Fallback if the LLM gets too chatty despite instructions
             if "Here is" in raw_prompt or raw_prompt.count(",") < 2:
                  logging.warning("LLM output formatting poor. Applying strict formatting.")
-                 self.music_prompt = f"{self.target_bpm} BPM, cinematic background music, atmospheric, synth, bass"
+                 self.music_prompt = f"BPM: {self.target_bpm}, Key: C Minor, cinematic, atmospheric, synth, bass"
             else:
                  self.music_prompt = raw_prompt
                  
@@ -93,7 +93,7 @@ class AIComposer:
             if "slow" in self.visual_context: mood = "lofi, relaxing, slow beat"
             if "energetic" in self.visual_context: mood = "rock or action, intense, fast drums"
             
-            self.music_prompt = f"{self.target_bpm} BPM, {mood} background music"
+            self.music_prompt = f"BPM: {self.target_bpm}, {mood} background music"
             return self.music_prompt
             
         except Exception as e:

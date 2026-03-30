@@ -65,6 +65,7 @@ class VideoAnalyzer:
         duration_sec = total_frames / fps if fps > 0 else 1
 
         cut_count = 0
+        cut_timestamps = []
         prev_hist = None
         
         total_brightness, total_saturation, total_motion = 0, 0, 0
@@ -104,6 +105,7 @@ class VideoAnalyzer:
                 diff = cv2.compareHist(prev_hist, hist, cv2.HISTCMP_CORREL)
                 if diff < 0.85: 
                     cut_count += 1
+                    cut_timestamps.append(frame_count / fps)
 
             prev_hist = hist
 
@@ -130,13 +132,13 @@ class VideoAnalyzer:
         logging.info(f"Detected {cut_count} cuts. Estimated Target BPM: {target_bpm}")
         logging.info(f"Visual Context: {visual_context}")
         
-        return target_bpm, visual_context
+        return target_bpm, visual_context, cut_timestamps
 
     def run_pipeline(self):
         if self.extract_audio():
             self.separate_vocals()
-            bpm, visual_context = self.analyze_visual_content()
-            return {"vocals_path": self.vocals_path, "target_bpm": bpm, "visual_context": visual_context}
+            bpm, visual_context, cut_timestamps = self.analyze_visual_content()
+            return {"vocals_path": self.vocals_path, "target_bpm": bpm, "visual_context": visual_context, "cut_timestamps": cut_timestamps}
         return None
 
 # Execution Block

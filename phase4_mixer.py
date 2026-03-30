@@ -7,10 +7,11 @@ import ffmpeg
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class FinalMixer:
-    def __init__(self, original_video, vocals_path, bgm_path, output_dir="workspace"):
+    def __init__(self, original_video, vocals_path, bgm_path, cut_timestamps=None, output_dir="workspace"):
         self.original_video = original_video
         self.vocals_path = vocals_path
         self.bgm_path = bgm_path
+        self.cut_timestamps = cut_timestamps or []
         self.output_dir = output_dir
         
         self.mixed_audio_path = os.path.join(output_dir, "final_mixed_audio.wav")
@@ -53,20 +54,33 @@ class FinalMixer:
 
         logging.info("Applying Auto-Ducking to background music...")
         
-        # 2. The Auto-Ducking Logic
+        # 2. The Auto-Ducking Logic & Visual Sidechain Sync
         chunk_size = 100 # Analyze audio in 100 millisecond chunks
         chunks = []
+        
+        # Convert cut timestamps to milliseconds for fast iteration
+        cut_ms_list = [int(ct * 1000) for ct in self.cut_timestamps]
         
         for i in range(0, len(vocals), chunk_size):
             vocal_chunk = vocals[i:i + chunk_size]
             bgm_chunk = bgm[i:i + chunk_size]
             
+            # Artificial Sidechain Check: If this audio chunk is right before a visual cut (e.g., 200ms before)
+            is_pre_cut = any([cut_ms - 200 <= i < cut_ms for cut_ms in cut_ms_list])
+            
             # If the vocals in this tiny chunk are louder than the threshold (someone is speaking)
             if vocal_chunk.dBFS > threshold_db:
-                # Lower the BGM volume
-                chunks.append((bgm_chunk - abs(ducking_db)).raw_data)
+                # Lower the BGM volume for speaking
+                duck_amount = abs(ducking_db)
+            elif is_pre_cut:
+                # Force an aggressive volume drop just before the visual cut so it "impacts" heavily on the cut frame
+                duck_amount = 12 
             else:
-                # Keep normal volume during silence/breaths
+                duck_amount = 0
+                
+            if duck_amount > 0:
+                chunks.append((bgm_chunk - duck_amount).raw_data)
+            else:
                 chunks.append(bgm_chunk.raw_data)
 
         # Reconstruct the audio segment from raw bytes (O(N) time)
