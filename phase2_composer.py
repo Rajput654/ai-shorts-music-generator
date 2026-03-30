@@ -8,9 +8,10 @@ import os
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class AIComposer:
-    def __init__(self, audio_path, target_bpm):
+    def __init__(self, audio_path, target_bpm, visual_context=""):
         self.audio_path = audio_path
         self.target_bpm = target_bpm
+        self.visual_context = visual_context
         # We use the 'base' model for speed and low VRAM usage. 
         # For a short video, this is usually accurate enough.
         self.whisper_model_size = "base" 
@@ -47,13 +48,13 @@ class AIComposer:
         # System prompt designed specifically to format output for AudioCraft/MusicGen
         system_instructions = (
             "You are an expert music producer scoring a video. "
-            "Analyze the transcript and the target BPM. "
+            "Analyze the transcript, the visual context, and the target BPM. "
             "Output ONLY a comma-separated list of musical descriptors (genre, mood, instruments). "
             "Do not include conversational text like 'Here is the prompt'. "
             f"Mandatory requirement: Include '{self.target_bpm} BPM' at the start."
         )
         
-        user_prompt = f"Transcript context: {transcript}"
+        user_prompt = f"Transcript context: {transcript}\nVisual context: {self.visual_context}"
 
         payload = {
             "model": "llama3",
@@ -80,8 +81,15 @@ class AIComposer:
 
         except requests.exceptions.ConnectionError:
             logging.error("Failed to connect to Ollama. Is the Ollama app running in the background?")
-            # Hard fallback so the pipeline doesn't completely die
-            self.music_prompt = f"{self.target_bpm} BPM, neutral background lofi beat, ambient"
+            # Dynamic fallback based on visual context
+            mood = "neutral, ambient"
+            if "dark" in self.visual_context: mood = "atmospheric, dark, cinematic"
+            if "bright" in self.visual_context: mood = "upbeat, happy, pop"
+            if "vibrant" in self.visual_context: mood = "energetic, electronic, synth"
+            if "slow" in self.visual_context: mood = "lofi, relaxing, slow beat"
+            if "energetic" in self.visual_context: mood = "rock or action, intense, fast drums"
+            
+            self.music_prompt = f"{self.target_bpm} BPM, {mood} background music"
             return self.music_prompt
             
         except Exception as e:

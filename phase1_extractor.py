@@ -51,36 +51,50 @@ class VideoAnalyzer:
             logging.error(f"Demucs failed: {e.stderr.decode()}")
             return False
 
-    def calculate_visual_pacing(self):
-        """Analyzes video frames to detect cuts and estimate a target BPM."""
-        logging.info("Analyzing video cuts to determine pacing...")
+    def analyze_visual_content(self):
+        """Analyzes video frames to detect cuts, estimate a target BPM, and extract visual context."""
+        logging.info("Analyzing video visual content to determine pacing and mood...")
         cap = cv2.VideoCapture(self.video_path)
         
         if not cap.isOpened():
             logging.error("Failed to open video for OpenCV analysis.")
-            return None
+            return 80, "standard video"
 
         fps = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration_sec = total_frames / fps
+        duration_sec = total_frames / fps if fps > 0 else 1
 
         cut_count = 0
         prev_hist = None
+        
+        total_brightness, total_saturation, total_motion = 0, 0, 0
+        frame_count = 0
+        prev_gray = None
 
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
             
-            # Convert to grayscale and calculate histogram for cut detection
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Use smaller frame for faster feature extraction
+            small_frame = cv2.resize(frame, (320, 180))
+            gray = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
+            hsv = cv2.cvtColor(small_frame, cv2.COLOR_BGR2HSV)
+            
+            # Extract visual traits
+            total_brightness += gray.mean()
+            total_saturation += hsv[:, :, 1].mean()
+            if prev_gray is not None:
+                total_motion += cv2.absdiff(gray, prev_gray).mean()
+            prev_gray = gray
+            frame_count += 1
+            
+            # Cut detection using histogram
             hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
             cv2.normalize(hist, hist)
 
             if prev_hist is not None:
-                # Compare current frame to previous frame
                 diff = cv2.compareHist(prev_hist, hist, cv2.HISTCMP_CORREL)
-                # A sudden drop in correlation usually indicates a scene cut
                 if diff < 0.85: 
                     cut_count += 1
 
@@ -88,19 +102,34 @@ class VideoAnalyzer:
 
         cap.release()
         
-        # Estimate BPM based on cut frequency (Cuts per minute)
-        # Base pacing of 80 BPM, adding speed for faster, frequent cuts
+        # Calculate BPM
         cuts_per_minute = (cut_count / duration_sec) * 60 if duration_sec > 0 else 0
-        target_bpm = min(max(int(80 + (cuts_per_minute * 0.5)), 60), 160) # Clamp between 60-160 BPM
+        target_bpm = min(max(int(80 + (cuts_per_minute * 0.5)), 60), 160)
         
+        # Calculate Visual Context
+        if frame_count > 0:
+            avg_brightness = total_brightness / frame_count
+            avg_saturation = total_saturation / frame_count
+            avg_motion = total_motion / frame_count
+            
+            brightness_desc = "dark" if avg_brightness < 85 else "bright" if avg_brightness > 170 else "balanced lighting"
+            saturation_desc = "muted" if avg_saturation < 60 else "vibrant" if avg_saturation > 140 else "standard colors"
+            motion_desc = "slow" if avg_motion < 5 else "energetic" if avg_motion > 15 else "moderate"
+            
+            visual_context = f"The visuals are {brightness_desc} and {saturation_desc}, with {motion_desc} motion."
+        else:
+            visual_context = "standard video"
+
         logging.info(f"Detected {cut_count} cuts. Estimated Target BPM: {target_bpm}")
-        return target_bpm
+        logging.info(f"Visual Context: {visual_context}")
+        
+        return target_bpm, visual_context
 
     def run_pipeline(self):
         if self.extract_audio():
             self.separate_vocals()
-            bpm = self.calculate_visual_pacing()
-            return {"vocals_path": self.vocals_path, "target_bpm": bpm}
+            bpm, visual_context = self.analyze_visual_content()
+            return {"vocals_path": self.vocals_path, "target_bpm": bpm, "visual_context": visual_context}
         return None
 
 # Execution Block

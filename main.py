@@ -39,7 +39,11 @@ def run_agent(input_video, output_dir="workspace", target_duration=30):
     # PHASE 2: AI Composition
     # ---------------------------------------------------------
     logger.info("\n--- INITIATING PHASE 2: COMPOSITION ---")
-    composer = AIComposer(audio_path=p1_data["vocals_path"], target_bpm=p1_data["target_bpm"])
+    composer = AIComposer(
+        audio_path=p1_data["vocals_path"], 
+        target_bpm=p1_data["target_bpm"],
+        visual_context=p1_data.get("visual_context", "")
+    )
     p2_data = composer.run_pipeline()
     
     if not p2_data:
