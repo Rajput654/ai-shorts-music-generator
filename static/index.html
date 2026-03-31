@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Music Composer</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="background-wrapper">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <main class="container">
+        <header style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+                <div class="logo">
+                    <i class="fa-solid fa-music"></i>
+                    <h1>Syntha<span>Verse</span></h1>
+                </div>
+                <p class="subtitle">Next-gen AI Music Synchronization</p>
+            </div>
+            <div id="user-nav" style="display: none; text-align: right;">
+                <p style="margin-bottom: 5px; color: var(--text-secondary);"><i class="fa-solid fa-user"></i> <span id="username-display">User</span></p>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="logout()" class="btn-secondary" style="padding: 5px 10px; font-size: 0.8rem;">Logout</button>
+                    <a id="admin-link" href="/admin" class="btn-primary" style="display: none; padding: 5px 10px; font-size: 0.8rem; text-decoration: none;"><i class="fa-solid fa-gauge"></i> Admin</a>
+                </div>
+            </div>
+        </header>
+
+        <section class="glass-panel" id="upload-section">
+            <div class="drag-drop-zone" id="drop-zone">
+                <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                <h2>Drag & Drop your Video</h2>
+                <p>or</p>
+                <label for="video-upload" class="btn-primary">Browse Files</label>
+                <input type="file" id="video-upload" accept="video/mp4,video/x-m4v,video/*" hidden>
+                <p class="file-info" id="file-info">No file selected</p>
+            </div>
+
+            <div class="settings-group">
+                <label for="target-duration">Target Duration (Seconds)</label>
+                <input type="number" id="target-duration" value="30" min="5" max="180">
+            </div>
+
+            <button id="generate-btn" class="submit-btn" disabled>
+                <span>Generate Soundtrack</span>
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </button>
+        </section>
+
+        <!-- Loading State -->
+        <section class="glass-panel hidden" id="loading-section">
+            <div class="loader">
+                <div class="waveform">
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                </div>
+            </div>
+            <h2>Composing Magic...</h2>
+            <p id="loading-status">Analyzing video structure & extracting vocals (This may take a few minutes)</p>
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+        </section>
+
+        <!-- Result State -->
+        <section class="glass-panel hidden" id="result-section">
+            <h2><i class="fa-solid fa-circle-check" style="color: #4ade80;"></i> Composition Complete!</h2>
+            <div class="video-container">
+                <video id="output-video" controls autoplay>
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <div class="action-buttons">
+                <a id="download-btn" href="#" download class="btn-secondary">
+                    <i class="fa-solid fa-download"></i> Download Video
+                </a>
+                <button id="reset-btn" class="btn-primary">
+                    <i class="fa-solid fa-rotate-left"></i> Create Another
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - SynthaVerse</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .table-container { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 1rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        th, td { 
+            padding: 1rem; 
+            text-align: left; 
+            border-bottom: 1px solid var(--border-color);
+        }
+        th { background: rgba(255,255,255,0.05); color: var(--accent); }
+        .role-badge {
+            background: rgba(129, 140, 248, 0.2);
+            color: #818cf8;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .role-admin { background: rgba(74, 222, 128, 0.2); color: #4ade80;}
+    </style>
+</head>
+<body>
+    <div class="background-wrapper">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <main class="container" style="max-width: 800px;">
+        <header style="display:flex; justify-content: space-between; align-items: center;">
+            <div class="logo">
+                <i class="fa-solid fa-shield-halved"></i>
+                <h1>Syntha<span>Admin</span></h1>
+            </div>
+            <a href="/" class="btn-secondary" style="text-decoration: none;"><i class="fa-solid fa-house"></i> Home</a>
+        </header>
+
+        <section class="glass-panel">
+            <h2><i class="fa-solid fa-users"></i> Registered Users</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">All active connections to your AI Composer Node.</p>
+            
+            <p id="error-message" style="color: #f87171; text-align: center;"></p>
+            
+            <table class="table-container" id="users-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Role Level</th>
+                    </tr>
+                </thead>
+                <tbody id="user-rows">
+                    <!-- Javascript generates rows here -->
+                    <tr><td colspan="3" style="text-align: center;">Loading secure databank...</td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            const token = localStorage.getItem("synthaverse_token");
+            if (!token) {
+                window.location.href = "/login";
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/auth/admin/users", {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                
+                if (res.status === 401 || res.status === 403) {
+                    alert("Unauthorized! You do not have super-admin permissions.");
+                    window.location.href = "/";
+                    return;
+                }
+                
+                if (!res.ok) throw new Error("Could not load users database");
+                
+                const users = await res.json();
+                const tbody = document.getElementById("user-rows");
+                tbody.innerHTML = "";
+                
+                if(users.length === 0){
+                    tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: gray;">No users registered</td></tr>`;
+                }
+
+                users.forEach(u => {
+                    const row = document.createElement("tr");
+                    const roleClass = u.role === "admin" ? "role-badge role-admin" : "role-badge";
+                    const statusText = u.is_verified ? "<span style='color: #4ade80;'><i class='fa-solid fa-check'></i> Verified</span>" : "<span style='color: #f87171;'><i class='fa-solid fa-clock'></i> Pending</span>";
+                    row.innerHTML = `
+                        <td style="color: gray;">#${u.id}</td>
+                        <td style="font-weight: bold;">${u.username}</td>
+                        <td style="color: #cbd5e1;">${u.email}</td>
+                        <td>${statusText}</td>
+                        <td><span class="${roleClass}">${u.role}</span></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+            } catch(e) {
+                document.getElementById("error-message").innerText = e.message;
+            }
+        });
+    </script>
+</body>
+</html>

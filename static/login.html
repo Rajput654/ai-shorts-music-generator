@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SynthaVerse</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .auth-form { display: flex; flex-direction: column; gap: 1.5rem; }
+        .auth-input { width: 100%; }
+        .error-msg { color: #f87171; text-align: center; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="background-wrapper">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <main class="container">
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-lock"></i>
+                <h1>Syntha<span>Login</span></h1>
+            </div>
+            <p class="subtitle">Access the AI Composer</p>
+        </header>
+
+        <section class="glass-panel">
+            <form id="login-form" class="auth-form">
+                <div class="settings-group">
+                    <label>Username</label>
+                    <input type="text" id="username" class="auth-input" required placeholder="Enter username">
+                </div>
+                <div class="settings-group">
+                    <label>Password</label>
+                    <input type="password" id="password" class="auth-input" required placeholder="Enter password">
+                </div>
+                
+                <p id="error-message" class="error-msg"></p>
+                
+                <button type="submit" class="submit-btn" id="login-btn">
+                    <span>Log In</span>
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                </button>
+            </form>
+            <div style="text-align: center; margin-top: 2rem;">
+                <p style="color: var(--text-secondary);">Don't have an account? <a href="/signup" style="color: var(--accent); text-decoration: none; font-weight: 600;">Sign up here</a></p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+            const formData = new FormData();
+            formData.append('username', document.getElementById('username').value);
+            formData.append('password', document.getElementById('password').value);
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.detail || "Login failed");
+                
+                localStorage.setItem('synthaverse_token', data.access_token);
+                window.location.href = '/';
+            } catch (err) {
+                document.getElementById('error-message').innerText = err.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span>Log In</span><i class="fa-solid fa-arrow-right-to-bracket"></i>';
+            }
+        });
+    </script>
+</body>
+</html>

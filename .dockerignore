@@ -1,0 +1,26 @@
+# Exclude Git files
+.git
+.gitignore
+
+# Exclude temporary python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+env.bak/
+venv.bak/
+
+# Exclude application temporary files & generated media
+workspace/
+output/
+temp_uploads/
+*.mp4
+*.mp3
+*.wav
+
+# Don't embed secrets inside the docker container
+.env

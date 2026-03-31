@@ -8,11 +8,8 @@ from dotenv import load_dotenv
 # Load configuration from .env if present
 load_dotenv()
 
-# Import the classes we built in the previous steps
-from phase1_extractor import VideoAnalyzer
-from phase2_composer import AIComposer
-from phase3_generator import MusicGenerator
-from phase4_mixer import FinalMixer
+# Phase modules will be lazy-loaded inside the run_agent function 
+# to prevent OpenBLAS and Torch Out-Of-Memory errors on web server bootup.
 
 # Set up master logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -22,6 +19,12 @@ def run_agent(input_video, base_workspace="workspace", target_duration=30):
     """
     Runs the entire automated music composition and mixing pipeline.
     """
+    # Lazy-load massive models and frameworks only when requested, saving hundreds of MBs of boot RAM
+    from phase1_extractor import VideoAnalyzer
+    from phase2_composer import AIComposer
+    from phase3_generator import MusicGenerator
+    from phase4_mixer import FinalMixer
+
     job_id = str(uuid.uuid4())
     output_dir = os.path.join(base_workspace, f"job_{job_id}")
     

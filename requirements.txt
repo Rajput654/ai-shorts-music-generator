@@ -19,3 +19,16 @@ torch>=2.1.0
 torchaudio>=2.1.0
 xformers>=0.0.22
 git+https://github.com/facebookresearch/audiocraft.git
+
+# Web Application
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+
+# Authentication & Database
+SQLAlchemy>=2.0.0
+PyJWT>=2.8.0
+passlib[bcrypt]>=1.7.4
+
+# Public Website Tunneling
+pyngrok>=7.0.0
