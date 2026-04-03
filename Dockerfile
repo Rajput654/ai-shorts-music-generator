@@ -11,11 +11,29 @@ ENV HOME=/home/user \
     PYTHONUNBUFFERED=1
 
 # Install system-level dependencies for audio/video processing
+# Note: Using FFmpeg 6.x for compatibility with PyAV 11.0.0
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
     git \
     libsndfile1 \
     pkg-config \
+    gcc \
+    g++ \
+    wget \
+    xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install FFmpeg 6.1 from static build (compatible with PyAV 11.0.0)
+RUN wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz && \
+    tar xf ffmpeg-release-amd64-static.tar.xz && \
+    mv ffmpeg-*-amd64-static/ffmpeg /usr/local/bin/ && \
+    mv ffmpeg-*-amd64-static/ffprobe /usr/local/bin/ && \
+    rm -rf ffmpeg-* && \
+    chmod +x /usr/local/bin/ffmpeg /usr/local/bin/ffprobe
+
+# Install FFmpeg development libraries (version 6.x from Debian testing)
+RUN echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    -t bookworm \
     libavformat-dev \
     libavcodec-dev \
     libavdevice-dev \
@@ -23,8 +41,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libavfilter-dev \
     libswscale-dev \
     libswresample-dev \
-    gcc \
-    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory to the user's home directory
