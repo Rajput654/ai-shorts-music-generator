@@ -1,5 +1,4 @@
 import os
-# Prevent OpenBLAS/Torch from crashing on low-memory/high-core machines
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -9,28 +8,65 @@ import uuid
 import logging
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Optional
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-# Import the existing agent runner
 from main import run_agent
-
-# Import Authentication system
 from auth import router as auth_router, get_current_user
 from database import SessionLocal, VideoJob
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("WebAPI")
 
-# Ensure required directories exist at import time
 UPLOAD_DIR = "temp_uploads"
-for d in [UPLOAD_DIR, "output", "workspace", "static"]:
+STATIC_DIR = "static"
+
+# Ensure all required directories exist at startup
+for d in [UPLOAD_DIR, "output", "workspace", STATIC_DIR]:
     os.makedirs(d, exist_ok=True)
+
+# -----------------------------------------------------------------------
+# Inline HTML fallback pages
+# These are used if the static/ files were not deployed with the container.
+# In production, the real HTML files in static/ take precedence.
+# -----------------------------------------------------------------------
+_MISSING_FILE_HTML = """<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>SynthaVerse</title>
+<style>
+  body {{ font-family: sans-serif; background: #0a0a0f; color: #f8fafc;
+         display: flex; align-items: center; justify-content: center;
+         min-height: 100vh; margin: 0; }}
+  .box {{ background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 16px; padding: 3rem; max-width: 480px; text-align: center; }}
+  h1 {{ color: #818cf8; margin-bottom: 1rem; }}
+  p  {{ color: #94a3b8; line-height: 1.6; }}
+  code {{ background: rgba(255,255,255,0.1); padding: 2px 8px;
+          border-radius: 4px; font-size: 0.9rem; }}
+</style></head>
+<body><div class="box">
+  <h1>⚠️ Static Files Missing</h1>
+  <p>The HTML frontend files were not found in the <code>static/</code> directory.</p>
+  <p>Please make sure your <code>static/</code> folder (containing
+     <code>index.html</code>, <code>login.html</code>, <code>signup.html</code>,
+     <code>admin.html</code>, <code>styles.css</code>, <code>script.js</code>)
+     is committed to your git repository and pushed to Hugging Face.</p>
+  <p>The API endpoints at <code>/api/</code> are running normally.</p>
+</div></body></html>"""
+
+
+def _serve_static(filename: str):
+    """Serve a file from static/ or return a helpful HTML error page."""
+    path = os.path.join(STATIC_DIR, filename)
+    if os.path.exists(path):
+        return FileResponse(path)
+    logger.error(f"Static file not found: {path}")
+    return HTMLResponse(
+        content=_MISSING_FILE_HTML.format(),
+        status_code=200   # 200 so the browser renders the page, not a blank error
+    )
 
 
 async def process_queue_worker():
@@ -54,7 +90,6 @@ async def process_queue_worker():
             duration = job.duration
             logger.info(f"Worker picked up job {job_id}.")
 
-            # Run heavy agent in a thread so we don't block the asyncio event loop
             final_video_path = await asyncio.to_thread(
                 run_agent, input_video=temp_video_path, target_duration=duration
             )
@@ -63,8 +98,6 @@ async def process_queue_worker():
                 raise Exception("Agent pipeline failed to produce a final video.")
 
             file_name = os.path.basename(final_video_path)
-
-            # Re-fetch after thread completes (session may be stale)
             job = db.query(VideoJob).filter(VideoJob.id == job_id).first()
             job.status = "completed"
             job.video_url = f"/api/output/{file_name}"
@@ -91,16 +124,11 @@ async def process_queue_worker():
             db.close()
 
 
-# -----------------------------------------------------------------------
-# Lifespan context manager (replaces deprecated @app.on_event("startup"))
-# -----------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start the background queue worker
     worker_task = asyncio.create_task(process_queue_worker())
     logger.info("Queue worker started.")
     yield
-    # Shutdown: cancel the worker gracefully
     worker_task.cancel()
     try:
         await worker_task
@@ -109,28 +137,12 @@ async def lifespan(app: FastAPI):
     logger.info("Queue worker stopped.")
 
 
-# -----------------------------------------------------------------------
-# CORS configuration
-# -----------------------------------------------------------------------
-# On Hugging Face Spaces the public URL is https://<owner>-<space-name>.hf.space
-# Allow that origin plus localhost for local development.
-# Set ALLOWED_ORIGINS as a comma-separated list in your HF Space Secrets.
-# Example: "https://myuser-myspace.hf.space,http://localhost:7860"
-_raw_origins = os.getenv(
-    "ALLOWED_ORIGINS",
-    # Default: allow all origins so the Space works out-of-the-box.
-    # Tighten this in production by setting the env var.
-    "*"
-)
+# CORS — defaults to * so HF Spaces works out of the box
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
 allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
-# -----------------------------------------------------------------------
-# App setup
-# -----------------------------------------------------------------------
 app = FastAPI(title="AI Music Composer API", version="1.0", lifespan=lifespan)
-
 app.include_router(auth_router)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -139,31 +151,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Only mount /static if the directory has actual files in it,
+# otherwise StaticFiles raises an error on directories with no files.
+if any(os.scandir(STATIC_DIR)) if os.path.exists(STATIC_DIR) else False:
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+else:
+    logger.warning("static/ directory is empty or missing — /static route not mounted.")
 
 
 # -----------------------------------------------------------------------
-# Page routes
+# Page routes — safe fallback if files are missing
 # -----------------------------------------------------------------------
 @app.get("/")
 async def serve_frontend():
-    return FileResponse("static/index.html")
-
+    return _serve_static("index.html")
 
 @app.get("/login")
 async def serve_login():
-    return FileResponse("static/login.html")
-
+    return _serve_static("login.html")
 
 @app.get("/signup")
 async def serve_signup():
-    return FileResponse("static/signup.html")
-
+    return _serve_static("signup.html")
 
 @app.get("/admin")
 async def serve_admin():
-    return FileResponse("static/admin.html")
+    return _serve_static("admin.html")
 
 
 # -----------------------------------------------------------------------
@@ -175,7 +188,6 @@ async def generate_music(
     duration: int = Form(30),
     current_user=Depends(get_current_user)
 ):
-    """Receive a video file and enqueue it for processing."""
     if not video.filename:
         raise HTTPException(status_code=400, detail="No video file provided.")
 
@@ -218,7 +230,6 @@ async def generate_music(
 
 @app.get("/api/jobs/{job_id}")
 async def get_job_status(job_id: str, current_user=Depends(get_current_user)):
-    """Polling endpoint for the frontend to check generation progress."""
     db = SessionLocal()
     try:
         job = db.query(VideoJob).filter(VideoJob.id == job_id).first()
@@ -236,14 +247,6 @@ async def get_job_status(job_id: str, current_user=Depends(get_current_user)):
 
 @app.get("/api/output/{filename}")
 async def get_output_video(filename: str, current_user=Depends(get_current_user)):
-    """
-    Serve the generated final videos.
-    Auth-protected to prevent unauthenticated file enumeration.
-    NOTE: FileResponse streams directly from disk - fine for HF Spaces.
-    For production, use a CDN or object storage (S3, R2, etc.) instead,
-    since HF Spaces disk is ephemeral and files are lost on restart.
-    """
-    # Sanitize filename to prevent path traversal attacks
     safe_name = os.path.basename(filename)
     file_path = os.path.join("output", safe_name)
     if os.path.exists(file_path):
