@@ -43,26 +43,22 @@
                     <label>Password</label>
                     <input type="password" id="password" class="auth-input" required minlength="6" placeholder="Create a strong password">
                 </div>
-                <!-- Hidden Admin Backdoor for the creator -->
-                <div class="settings-group" style="padding-top:1rem; border-top: 1px dotted rgba(255,255,255,0.2);">
-                    <label style="color: rgba(255,255,255,0.4); font-size: 0.8rem;">(Optional) Creator Secret Code</label>
-                    <input type="password" id="admin_secret" style="background: rgba(0,0,0,0.1); border-color: rgba(255,255,255,0.1);" class="auth-input" placeholder="Enter 'superadmin123' for admin access">
-                </div>
-                
+
                 <p id="error-message" class="error-msg"></p>
-                
+
                 <button type="submit" class="submit-btn" id="signup-btn">
                     <span>Create Account</span>
                     <i class="fa-solid fa-wand-magic-sparkles"></i>
                 </button>
             </form>
-            
+
             <form id="otp-form" class="auth-form" style="display: none;">
                 <h3 style="text-align: center; color: white;">Email Verification</h3>
                 <p style="text-align: center; color: var(--text-secondary); font-size: 0.9rem;">We sent a 6-digit code to your email.</p>
                 <div class="settings-group">
                     <label>OTP Code</label>
-                    <input type="text" id="otp" class="auth-input" required maxlength="6" placeholder="123456" style="text-align: center; font-size: 1.5rem; letter-spacing: 5px;">
+                    <input type="text" id="otp" class="auth-input" required maxlength="6" placeholder="123456"
+                        style="text-align: center; font-size: 1.5rem; letter-spacing: 5px;">
                 </div>
                 <p id="otp-error-message" class="error-msg"></p>
                 <button type="submit" class="submit-btn" id="otp-btn">
@@ -72,7 +68,9 @@
             </form>
 
             <div style="text-align: center; margin-top: 2rem;">
-                <p style="color: var(--text-secondary);">Already have an account? <a href="/login" style="color: var(--accent); text-decoration: none; font-weight: 600;">Log in here</a></p>
+                <p style="color: var(--text-secondary);">Already have an account?
+                    <a href="/login" style="color: var(--accent); text-decoration: none; font-weight: 600;">Log in here</a>
+                </p>
             </div>
         </section>
     </main>
@@ -83,28 +81,23 @@
             const btn = document.getElementById('signup-btn');
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
+            // SECURITY FIX: admin_secret field removed from payload entirely.
             const payload = {
                 username: document.getElementById('username').value,
                 email: document.getElementById('email').value,
-                password: document.getElementById('password').value,
-                admin_secret: document.getElementById('admin_secret').value || null
+                password: document.getElementById('password').value
             };
-
             try {
                 const res = await fetch('/api/auth/signup', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 const data = await res.json();
-                
                 if (!res.ok) throw new Error(data.detail || "Signup failed");
-                
-                // Show OTP form instead of redirecting
+                // Show OTP form
                 document.getElementById('signup-form').style.display = 'none';
                 document.getElementById('otp-form').style.display = 'flex';
-                
             } catch (err) {
                 document.getElementById('error-message').innerText = err.message;
             } finally {
@@ -112,28 +105,23 @@
                 btn.innerHTML = '<span>Create Account</span><i class="fa-solid fa-wand-magic-sparkles"></i>';
             }
         });
-
         document.getElementById('otp-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('otp-btn');
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
             const payload = {
                 username: document.getElementById('username').value,
                 otp: document.getElementById('otp').value
             };
-
             try {
                 const res = await fetch('/api/auth/verify-otp', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 const data = await res.json();
-                
                 if (!res.ok) throw new Error(data.detail || "Verification failed");
-                
                 localStorage.setItem('synthaverse_token', data.access_token);
                 window.location.href = '/';
             } catch (err) {
