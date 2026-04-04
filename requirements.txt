@@ -1,5 +1,5 @@
 # Video and Image Processing
-opencv-python>=4.8.0
+opencv-python-headless>=4.8.0
 ffmpeg-python>=0.2.0
 
 # Audio Processing and Separation
@@ -10,25 +10,44 @@ pydub>=0.25.1
 openai-whisper>=20231117
 requests>=2.31.0
 
-# Production Readiness (Env and Resilience)
+# Production Readiness
 python-dotenv>=1.0.0
 tenacity>=8.2.0
 
-# PyTorch and Music Generation (AudioCraft)
-torch>=2.1.0
-torchaudio>=2.1.0
-xformers>=0.0.22
-git+https://github.com/facebookresearch/audiocraft.git
+# -----------------------------------------------------------------------
+# PyTorch - install BEFORE audiocraft
+# -----------------------------------------------------------------------
+torch>=2.1.0,<2.2.0
+torchaudio>=2.1.0,<2.2.0
+xformers>=0.0.23,<0.0.24
+
+# -----------------------------------------------------------------------
+# AudioCraft dependencies installed manually (modern compatible versions).
+# We use --no-deps on audiocraft itself in the Dockerfile so that pip does
+# NOT try to pin av==11.0.0 (which no longer has a binary wheel on PyPI).
+# av>=12 is API-compatible with what audiocraft uses internally.
+# -----------------------------------------------------------------------
+av>=12.0.0
+einops
+flashy>=0.0.1
+hydra-core>=1.1
+hydra_colorlog
+julius
+num2words
+sentencepiece
+spacy>=3.6.1
+encodec
+transformers>=4.31.0
+
+# audiocraft itself - installed with --no-deps in Dockerfile
+# (listed here as a comment only; actual install is in Dockerfile step)
 
 # Web Application
 fastapi>=0.100.0
-uvicorn>=0.23.0
+uvicorn[standard]>=0.23.0
 python-multipart>=0.0.6
 
 # Authentication & Database
 SQLAlchemy>=2.0.0
 PyJWT>=2.8.0
-passlib[bcrypt]>=1.7.4
-
-# Public Website Tunneling
-pyngrok>=7.0.0
+bcrypt>=4.0.0
