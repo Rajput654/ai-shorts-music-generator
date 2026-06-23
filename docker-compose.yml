@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000" # Maps port 8000 of the container to port 8000 on your cloud server
+    env_file:
+      - .env # Automatically injects your production API keys and database strings
+    restart: always # Automatically restarts the app if the cloud server reboots
